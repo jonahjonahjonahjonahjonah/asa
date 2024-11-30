@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RC Car Control</title>
+</head>
+<body>
+    <h1>controls</h1>
+    <form action="/control" method="post">
+        <button name="direction" value="forward" style="padding: 10px">Forward</button>
+        <button name="direction" value="backward" style="padding: 10px">Backward</button>
+        <button name="direction" value="right" style="padding: 10px">Right</button>
+        <button name="direction" value="left" style="padding: 10px">Left</button>
+        <button name="direction" value="stop" style="padding: 10px">Stop</button>
+    </form>
+    <h1>Video</h1>
+    <img src="{{ url_for('video_feed') }}"> 
+</body>
+</html>
