@@ -15,5 +15,9 @@
     </form>
     <h1>Video</h1>
     <img src="{{ url_for('video_feed') }}"> 
+    <form action="/record" method="post">
+        <button name="recording" value="start" style="padding: 10px">Start</button>
+        <button name="recording" value="stop" style="padding: 10px">Stop</button>
+    </form>
 </body>
 </html>
