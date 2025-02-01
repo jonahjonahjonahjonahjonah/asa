@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 import os
 import subprocess
+import requests
 
 app = Flask(__name__)
 
@@ -26,6 +27,16 @@ def train():
     # train model and get viwer 
     result = subprocess.run(f'ns-train nerfacto --data {PROCESSED_DATA_DIR} --viewer.make-share-url True | grep "Shareable viewer URL"', shell=True, capture_output=True, text=True)  
     return jsonify({"url": result.stdout})
+
+@app.route('/send', methods=['POST'])
+def send():
+    #send back the files to the car
+    url = 'IDK'
+    modelpath = 'IDK'
+    camerapathpath = 'idk'
+    files = {'model': modelpath,
+             'camera_path':  camerapathpath}
+    requests.post(url, files=files)
 
 if __name__ == '__main__':
     app.run(debug=True)
