@@ -3,6 +3,7 @@ import cv2
 import time
 import threading
 import requests
+import os
 # from gpiozero import Motor
 
 # frontleft = Motor(3,2)
@@ -98,6 +99,9 @@ def recordcontrol():
     print("recording"+str(recording))
     return '',204
 
+upload_folder = './output' 
+app.config['UPLOAD_FOLDER'] = upload_folder
+
 @app.route('/train', methods=["POST"])
 def train():   
     if request.form['train'] == 'train':
@@ -116,11 +120,23 @@ def train():
         url = 'http://127.0.0.1:5000/train'
         response = requests.post(url)
         print(response.json())  
+
+        # tell the api to send the file back to the car
+        url = 'http://127.0.0.1:5000/send'
+        requests.post(url) 
+
+        # save the file 
+        model = request.files['model']
+        camera_path = request.files['camera_path']
+        
+        model.save(os.path.join(app.config['UPLOAD_FOLDER'], model.filename))
+        camera_path.save(os.path.join(app.config['UPLOAD_FOLDER'], camera_path.filename))
+        
+
+
+        print('file saved')  
         
     return '',204
-
-
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True, threaded=True)
