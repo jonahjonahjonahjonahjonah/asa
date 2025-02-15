@@ -5,18 +5,19 @@ import requests
 
 app = Flask(__name__)
 
-upload_folder = './uploads' 
+upload_folder = 'uploads' 
+os.makedirs(upload_folder, exist_ok=True)  
 app.config['UPLOAD_FOLDER'] = upload_folder
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
 
-    file = request.files['file']
-    if file:
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
-        return jsonify({'message': 'File uploaded'}), 200
-  
-    
+    file = request.files.get('file')
+
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+    file.save(filepath)
+    return jsonify({'message': 'File uploaded'}), 200 
+
 @app.route('/train', methods=['POST'])
 def train():
 
@@ -26,17 +27,20 @@ def train():
 
     # train model and get viwer 
     result = subprocess.run(f'ns-train nerfacto --data {PROCESSED_DATA_DIR} --viewer.make-share-url True | grep "Shareable viewer URL"', shell=True, capture_output=True, text=True)  
+
     return jsonify({"url": result.stdout})
 
-@app.route('/send', methods=['POST'])
+@app.route('/send', methods=['POST','GET'])
 def send():
-    #send back the files to the car
-    url = 'IDK'
-    modelpath = 'IDK'
-    camerapathpath = 'idk'
+    send back the files to the car
+    url = 'http://127.0.0.1:5000/recieve'
+    modelpath = 'folder/test.txt'
+    camerapathpath = 'folder/lol.json'
     files = {'model': modelpath,
              'camera_path':  camerapathpath}
     requests.post(url, files=files)
+    return '',204
 
-if __name__ == '__main__':
-    app.run(debug=True)
+# if __name__ == '__main__':
+#     app.run(debug=True)
+app.run(host='0.0.0.0', port=5001, debug=True, threaded=True)
