@@ -99,44 +99,48 @@ def recordcontrol():
     print("recording"+str(recording))
     return '',204
 
-upload_folder = './output' 
+upload_folder = 'uploads' 
 app.config['UPLOAD_FOLDER'] = upload_folder
 
-@app.route('/train', methods=["POST"])
+@app.route('/train', methods=["POST","GET"])
 def train():   
-    if request.form['train'] == 'train':
+    if request.form['train'] == 'upload':
         # upload the video to api
 
-        url = 'http://127.0.0.1:5000/upload' # or some other url
-        file_path = 'test.txt'
+        url = 'http://127.0.0.1:5001/upload' # or some other url
+        file_path = 'video.avi'
 
         with open(file_path, 'rb') as file:
             files = {'file': file}
             response = requests.post(url, files=files)
 
-        print(response.json())
+        return render_template('index.html', text=response.text)
 
+    elif request.form['train'] == 'train':
         # process and train and viewer url
-        url = 'http://127.0.0.1:5000/train'
+        url = 'http://127.0.0.1:5001/train'
         response = requests.post(url)
-        print(response.json())  
-
+        return render_template('index.html', text=response.text) 
+     
+    elif request.form['train'] == 'send':
         # tell the api to send the file back to the car
-        url = 'http://127.0.0.1:5000/send'
+        url = 'http://127.0.0.1:5001/send'
         requests.post(url) 
+        return '',204
 
-        # save the file 
-        model = request.files['model']
-        camera_path = request.files['camera_path']
-        
-        model.save(os.path.join(app.config['UPLOAD_FOLDER'], model.filename))
-        camera_path.save(os.path.join(app.config['UPLOAD_FOLDER'], camera_path.filename))
-        
-
-
-        print('file saved')  
-        
     return '',204
+
+@app.route('/recieve', methods=['POST'])
+def recieve():
+    # save the file 
+    model = request.files.get('model')
+    camera_path = request.files.get('camera_path')
+
+    model.save(os.path.join(app.config['UPLOAD_FOLDER'], model.filename))
+    camera_path.save(os.path.join(app.config['UPLOAD_FOLDER'], camera_path.filename))        
+
+    print('file saved')  
+    return render_template('test.html')  
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True, threaded=True)
