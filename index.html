@@ -19,5 +19,14 @@
         <button name="recording" value="start" style="padding: 10px">Start</button>
         <button name="recording" value="stop" style="padding: 10px">Stop</button>
     </form>
+    <form action="/train" method="post">
+        <button name="train" value="upload" style="padding: 10px">upload</button>
+        <button name="train" value="train" style="padding: 10px">train</button>
+        <button name="train" value="send" style="padding: 10px">send model & path</button>
+
+    </form>
+    {% if text %}
+        <h2>{{ text }}</h2>
+    {% endif %}
 </body>
 </html>
