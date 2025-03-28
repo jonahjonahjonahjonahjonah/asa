@@ -1,46 +1,72 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response, send_file
+from werkzeug.utils import secure_filename
 import os
 import subprocess
 import requests
+import time
+from flask_cors import CORS
+import shutil
 
 app = Flask(__name__)
+CORS(app)
 
-upload_folder = 'uploads' 
-os.makedirs(upload_folder, exist_ok=True)  
-app.config['UPLOAD_FOLDER'] = upload_folder
+def run_command(command): # running and output command
+
+    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    
+    for line in process.stdout:
+        yield f"data: {line.strip()}\n\n" 
+
+UPLOAD_FOLDER = 'uploads' 
+# os.makedirs(UPLOAD_FOLDER, exist_ok=True)  
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+@app.route('/')
+def index():
+    return jsonify({'message':'The server is running'})
 
 @app.route('/upload', methods=['POST'])
-def upload_file():
+def upload_file(): # save uploaded video file 
 
     file = request.files.get('file')
-
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-    file.save(filepath)
+    filename = secure_filename(file.filename)
+    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
     return jsonify({'message': 'File uploaded'}), 200 
 
-@app.route('/train', methods=['POST'])
-def train():
+@app.route('/train', methods=['GET'])
+def train(): # process video and train nerfstudio
 
-    PROCESSED_DATA_DIR=''
-    #process the video file
-    subprocess.run(f'ns-process-data video --data {upload_folder} --output-dir {PROCESSED_DATA_DIR}', shell=True)
+    PROCESSED_DATA_DIR = 'processed'
+    OUTPUT_DIR = 'outputs'
 
-    # train model and get viwer 
-    result = subprocess.run(f'ns-train nerfacto --data {PROCESSED_DATA_DIR} --viewer.make-share-url True | grep "Shareable viewer URL"', shell=True, capture_output=True, text=True)  
+    # terminal commands to process the video file & train nerf model
+    processcmd = f'ns-process-data video --data {UPLOAD_FOLDER}/video.avi --output-dir {PROCESSED_DATA_DIR}'
+    #'ns-train nerfacto --data data/nerfstudio/poster --output-dir outputs/ --experiment-name test --timestamp none'
+    
+    traincmd = f'ns-train nerfacto --data {PROCESSED_DATA_DIR} --output-dir {OUTPUT_DIR} --experiment-name test --timestamp none'
+    # processcmd = f'sl'
+    # traincmd = f'echo "done"'
 
-    return jsonify({"url": result.stdout})
+    shutil.rmtree(f'{OUTPUT_DIR}/test')
+
+    headers = {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "Access-Control-Allow-Origin": "*" 
+    }
+    return Response(run_command(processcmd + '&&' + traincmd), headers=headers)
 
 @app.route('/send', methods=['POST','GET'])
 def send():
-    send back the files to the car
-    url = 'http://127.0.0.1:5000/recieve'
-    modelpath = 'folder/test.txt'
-    camerapathpath = 'folder/lol.json'
-    files = {'model': modelpath,
-             'camera_path':  camerapathpath}
-    requests.post(url, files=files)
-    return '',204
+    global OUTPUT_DIR
+    folder_path = f'{OUTPUT_DIR}/test/nerfacto/none'
 
-# if __name__ == '__main__':
-#     app.run(debug=True)
-app.run(host='0.0.0.0', port=5001, debug=True, threaded=True)
+    #zip
+    shutil.make_archive('output', 'zip', folder_path)
+    #send
+    return send_file('output.zip', as_attachment=True)
+
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5001, debug=True, threaded=True)
