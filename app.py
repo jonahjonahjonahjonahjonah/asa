@@ -3,7 +3,8 @@ import cv2
 import time
 import threading
 import requests
-import os
+import subprocess
+import zipfile
 # from gpiozero import Motor
 
 # frontleft = Motor(3,2)
@@ -38,8 +39,9 @@ def record():
         time.sleep(0.1)
 
 def gen_frames(): 
-    camera = cv2.VideoCapture(0, cv2.CAP_DSHOW)  
-
+    camera = cv2.VideoCapture(0)  
+    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
     while True:
         ret, frame = camera.read()  
         if ret == True:
@@ -83,7 +85,7 @@ def control():
         # backleft.stop()
         # backright.stop()
     return '',204
-
+        
 @app.route('/video_feed')
 def video_feed():
     return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame') 
@@ -102,45 +104,74 @@ def recordcontrol():
 upload_folder = 'uploads' 
 app.config['UPLOAD_FOLDER'] = upload_folder
 
-@app.route('/train', methods=["POST","GET"])
-def train():   
-    if request.form['train'] == 'upload':
-        # upload the video to api
+@app.route('/train', methods=["POST", "GET"])
+def train():
+    url = 'http://localhost:5001'
+    # url = 'http://server.emmerich.co.id:5001'
+    train_value = request.form.get('train') # options; what to do from button
 
-        url = 'http://127.0.0.1:5001/upload' # or some other url
+    if train_value == 'upload':
+        # Upload the video to API
+        uploadurl = f'{url}/upload' 
         file_path = 'video.avi'
 
         with open(file_path, 'rb') as file:
             files = {'file': file}
-            response = requests.post(url, files=files)
+            response = requests.post(uploadurl, files=files)
 
         return render_template('index.html', text=response.text)
 
-    elif request.form['train'] == 'train':
-        # process and train and viewer url
-        url = 'http://127.0.0.1:5001/train'
-        response = requests.post(url)
-        return render_template('index.html', text=response.text) 
-     
-    elif request.form['train'] == 'send':
-        # tell the api to send the file back to the car
-        url = 'http://127.0.0.1:5001/send'
-        requests.post(url) 
-        return '',204
+    elif train_value == 'train':
+        # Process and train and return viewer URL
+        trainurl = f'{url}/train'
+        response = requests.get(trainurl)
+        
+        return render_template('stream.html', producer_url=trainurl) 
 
-    return '',204
+    elif train_value == 'send':
+        # Tell the API to send the file back to the car
+            url='http://localhost:5000/send'
+            response = requests.get(url)
 
-@app.route('/recieve', methods=['POST'])
+            # download zip
+            if response.status_code == 200:
+                with open('output.zip', 'wb') as f:
+                    f.write(response.content)
+                print("zip downloaded")
+            else:
+                print(f"Failed to download: {response.status_code}")
+
+            # extract zip
+            zip_path = 'output.zip'
+            folder = 'output'
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(folder)
+            print('unzipped')
+
+            return '',204
+    
+    return '', 204  
+
+@app.route('/viewer')
 def recieve():
-    # save the file 
-    model = request.files.get('model')
-    camera_path = request.files.get('camera_path')
+    
+    def run():
+        if request.form.get('viewer') == 'start':
+            traincmd = 'ns-viewer --load-config output/config.yml --viewer.make-share-url True'
+            #traincmd = 'ping -c 5 google.com'
+            process = subprocess.Popen(traincmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            for line in process.stdout:
+                yield f'data: {line}\n\n'
+    
+    headers = {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "Access-Control-Allow-Origin": "*" 
+    }
+    return Response(run(), headers=headers)
 
-    model.save(os.path.join(app.config['UPLOAD_FOLDER'], model.filename))
-    camera_path.save(os.path.join(app.config['UPLOAD_FOLDER'], camera_path.filename))        
 
-    print('file saved')  
-    return render_template('test.html')  
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True, threaded=True)
